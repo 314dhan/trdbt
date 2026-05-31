@@ -1,16 +1,23 @@
 import type { SignalResult, Mode } from '../types';
 
-const CONFIG = {
-  BUY:     { color: 'var(--green)',  bg: 'var(--green-bg)',  label: '↑ BUY' },
-  SELL:    { color: 'var(--red)',    bg: 'var(--red-bg)',    label: '↓ SELL' },
-  NEUTRAL: { color: 'var(--yellow)', bg: 'var(--yellow-bg)', label: '→ NEUTRAL' },
+const CONFIG: Record<string, Record<string, { color: string; bg: string; label: string }>> = {
+  spot: {
+    BUY:     { color: 'var(--green)',  bg: 'var(--green-bg)',  label: '↑ BUY' },
+    SELL:    { color: 'var(--red)',    bg: 'var(--red-bg)',    label: '↓ SELL' },
+    NEUTRAL: { color: 'var(--yellow)', bg: 'var(--yellow-bg)', label: '→ NEUTRAL' },
+  },
+  futures: {
+    BUY:     { color: 'var(--green)',  bg: 'var(--green-bg)',  label: '↑ LONG' },
+    SELL:    { color: 'var(--red)',    bg: 'var(--red-bg)',    label: '↓ SHORT' },
+    NEUTRAL: { color: 'var(--yellow)', bg: 'var(--yellow-bg)', label: '→ NEUTRAL' },
+  },
 };
 
 type Props = { result: SignalResult; asset: string; mode: Mode };
 
 export function SignalCard({ result, asset, mode }: Props) {
   const { signal, score, updatedAt, tpsl } = result;
-  const c = CONFIG[signal];
+  const c = CONFIG[mode][signal];
   const fp = (n: number) => n > 999 ? n.toFixed(2) : n > 1 ? n.toFixed(4) : n.toFixed(6);
   const showTpSl = signal !== 'NEUTRAL';
 
