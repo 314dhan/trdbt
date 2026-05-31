@@ -1,8 +1,9 @@
-import type { OHLCV, SignalResult, IndicatorValues, IndicatorSignal, SignalType } from '../types';
+import type { OHLCV, SignalResult, IndicatorValues, IndicatorSignal, SignalType, TPSL } from '../types';
 import { calcRSI } from '../indicators/rsi';
 import { calcEMA } from '../indicators/ema';
 import { calcMACD } from '../indicators/macd';
 import { calcBollinger } from '../indicators/bollinger';
+import { calcATR } from '../indicators/atr';
 
 export function aggregate(candles: OHLCV[]): SignalResult {
   const closes = candles.map(c => c.close);
@@ -44,5 +45,16 @@ export function aggregate(candles: OHLCV[]): SignalResult {
   const score = sigs.reduce((s, sig) => s + (sig === 'bullish' ? 1 : sig === 'bearish' ? -1 : 0), 0);
   const signal: SignalType = score >= 2 ? 'BUY' : score <= -2 ? 'SELL' : 'NEUTRAL';
 
-  return { signal, score, indicators, candles, updatedAt: new Date() };
+  const atr = calcATR(candles);
+  const SL_MULT = 1.5;
+  const TP_MULT = 3.0;
+  const tpsl: TPSL = {
+    entry: lastClose,
+    tp: signal === 'SELL' ? lastClose - TP_MULT * atr : lastClose + TP_MULT * atr,
+    sl: signal === 'SELL' ? lastClose + SL_MULT * atr : lastClose - SL_MULT * atr,
+    atr,
+    rr: TP_MULT / SL_MULT,
+  };
+
+  return { signal, score, indicators, tpsl, candles, updatedAt: new Date() };
 }

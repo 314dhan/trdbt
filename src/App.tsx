@@ -1,28 +1,38 @@
-import { useState, useEffect, useCallback } from 'react';
-import type { Asset, SignalResult } from './types';
+import { useState, useEffect, useCallback, useRef } from 'react';
+import type { Mode, AssetConfig, SignalResult, Timeframe } from './types';
+import { ASSET_CONFIGS, TIMEFRAME_LABELS, SCALPING_TIMEFRAMES, refreshInterval } from './types';
 import { fetchKlines } from './api/bybit';
 import { aggregate } from './signals/aggregate';
 import { SignalCard } from './components/SignalCard';
 import { IndicatorPanel } from './components/IndicatorPanel';
 import { PriceChart } from './components/PriceChart';
 
-const ASSETS: Asset[] = ['BTCUSDT', 'XAUUSDT'];
-const LABELS: Record<Asset, string> = { BTCUSDT: 'BTC/USDT', XAUUSDT: 'XAU/USDT' };
-const REFRESH_MS = 30_000;
+const TIMEFRAMES = Object.keys(TIMEFRAME_LABELS) as Timeframe[];
+
+function assetKey(a: AssetConfig) { return `${a.symbol}-${a.category}`; }
 
 export default function App() {
-  const [active, setActive] = useState<Asset>('BTCUSDT');
-  const [results, setResults] = useState<Partial<Record<Asset, SignalResult>>>({});
+  const [mode, setMode] = useState<Mode>('spot');
+  const [timeframe, setTimeframe] = useState<Timeframe>('60');
+  const [activeKey, setActiveKey] = useState('BTCUSDT-spot');
+  const [results, setResults] = useState<Record<string, SignalResult>>({});
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [lastRefresh, setLastRefresh] = useState<Date | null>(null);
+  const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
-  const refresh = useCallback(async () => {
+  const assets = ASSET_CONFIGS.filter(a => a.mode === mode);
+  const activeAsset = assets.find(a => assetKey(a) === activeKey) ?? assets[0];
+
+  const refresh = useCallback(async (tf: Timeframe, assetList: AssetConfig[]) => {
     try {
       setError(null);
+      setLoading(true);
       const entries = await Promise.all(
-        ASSETS.map(async a => [a, aggregate(await fetchKlines(a))] as const)
+        assetList.map(async a => [assetKey(a), aggregate(await fetchKlines(a.symbol, a.category, tf))] as const)
       );
-      setResults(Object.fromEntries(entries));
+      setResults(prev => ({ ...prev, ...Object.fromEntries(entries) }));
+      setLastRefresh(new Date());
     } catch (e) {
       setError((e as Error).message);
     } finally {
@@ -31,64 +41,140 @@ export default function App() {
   }, []);
 
   useEffect(() => {
-    refresh();
-    const id = setInterval(refresh, REFRESH_MS);
-    return () => clearInterval(id);
-  }, [refresh]);
+    const list = ASSET_CONFIGS.filter(a => a.mode === mode);
+    refresh(timeframe, list);
 
-  const current = results[active];
+    if (intervalRef.current) clearInterval(intervalRef.current);
+    const ms = refreshInterval(timeframe);
+    intervalRef.current = setInterval(() => refresh(timeframe, list), ms);
+    return () => { if (intervalRef.current) clearInterval(intervalRef.current); };
+  }, [refresh, timeframe, mode]);
+
+  // ensure activeKey belongs to current mode
+  useEffect(() => {
+    const list = ASSET_CONFIGS.filter(a => a.mode === mode);
+    if (!list.find(a => assetKey(a) === activeKey)) {
+      setActiveKey(assetKey(list[0]));
+    }
+  }, [mode, activeKey]);
+
+  const current = results[assetKey(activeAsset)];
+  const isScalping = SCALPING_TIMEFRAMES.includes(timeframe);
+  const ms = refreshInterval(timeframe);
+
+  const btn = (active: boolean, color: string) => ({
+    padding: '6px 16px', borderRadius: 6, fontSize: 13, fontWeight: 600,
+    cursor: 'pointer', border: 'none', transition: 'all 0.15s',
+    background: active ? color : 'transparent',
+    color: active ? '#fff' : 'var(--ink-2)',
+  } as React.CSSProperties);
+
+  const pill = (active: boolean, color: string) => ({
+    padding: '5px 11px', borderRadius: 6, fontSize: 12, fontWeight: 600,
+    cursor: 'pointer', transition: 'all 0.15s',
+    background: active ? color : 'transparent',
+    color: active ? '#fff' : 'var(--ink-3)',
+    border: `1px solid ${active ? color : 'var(--border)'}`,
+  } as React.CSSProperties);
 
   return (
-    <div className="min-h-screen bg-slate-900 text-white p-4 md:p-8">
-      <div className="max-w-3xl mx-auto space-y-5">
-        <div className="flex items-center justify-between">
+    <div style={{ background: 'var(--bg)', minHeight: '100vh', padding: '24px 16px' }}>
+      <div style={{ maxWidth: 720, margin: '0 auto', display: 'flex', flexDirection: 'column', gap: 18 }}>
+
+        {/* Header */}
+        <header style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 16 }}>
           <div>
-            <h1 className="text-2xl font-black">Signal Bot</h1>
-            <p className="text-slate-500 text-sm">RSI · EMA · MACD · Bollinger · 1h candles</p>
+            <h1 style={{ fontSize: 22, fontWeight: 700, letterSpacing: '-0.02em', color: 'var(--ink)', lineHeight: 1.2 }}>
+              Signal Bot
+            </h1>
+            <p style={{ color: 'var(--ink-3)', fontSize: 12, marginTop: 3, display: 'flex', alignItems: 'center', gap: 6 }}>
+              RSI · EMA · MACD · Bollinger · ATR
+              {isScalping && (
+                <span style={{ background: 'var(--yellow-bg)', color: 'var(--yellow)', fontSize: 10, fontWeight: 700, padding: '2px 7px', borderRadius: 4, letterSpacing: '0.05em' }}>
+                  SCALPING
+                </span>
+              )}
+            </p>
           </div>
-          <button
-            onClick={refresh}
-            className="bg-slate-700 hover:bg-slate-600 transition text-sm px-4 py-2 rounded-lg font-medium"
-          >
-            ↻ Refresh
-          </button>
+          <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 4 }}>
+            <button
+              onClick={() => refresh(timeframe, ASSET_CONFIGS.filter(a => a.mode === mode))}
+              style={{ background: 'var(--surface)', border: '1px solid var(--border)', color: 'var(--ink-2)', borderRadius: 'var(--radius-sm)', padding: '7px 14px', fontSize: 13, fontWeight: 500, cursor: 'pointer' }}
+            >
+              ↻ Refresh
+            </button>
+            <span style={{ color: 'var(--ink-3)', fontSize: 10 }}>Every {ms / 1000}s</span>
+          </div>
+        </header>
+
+        {/* Mode: Spot / Futures */}
+        <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
+          <div style={{ display: 'flex', background: 'var(--surface)', borderRadius: 'var(--radius-sm)', padding: 3, gap: 2, border: '1px solid var(--border)' }}>
+            <button onClick={() => setMode('spot')}    style={btn(mode === 'spot',    'var(--blue)')}>Spot</button>
+            <button onClick={() => setMode('futures')} style={btn(mode === 'futures', 'var(--violet)')}>Futures / Perp</button>
+          </div>
         </div>
 
-        <div className="flex gap-2">
-          {ASSETS.map(a => (
-            <button
-              key={a}
-              onClick={() => setActive(a)}
-              className={`px-5 py-2 rounded-lg font-semibold text-sm transition ${
-                active === a ? 'bg-blue-600 text-white' : 'bg-slate-800 text-slate-400 hover:text-white'
-              }`}
-            >
-              {LABELS[a]}
+        {/* Asset tabs */}
+        <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+          {assets.map(a => {
+            const k = assetKey(a);
+            const res = results[k];
+            const sigColor = res ? ({ BUY: 'var(--green)', SELL: 'var(--red)', NEUTRAL: 'var(--yellow)' }[res.signal]) : 'var(--border)';
+            return (
+              <button
+                key={k}
+                onClick={() => setActiveKey(k)}
+                style={{
+                  padding: '7px 14px', borderRadius: 'var(--radius-sm)', fontSize: 13, fontWeight: 600,
+                  cursor: 'pointer', transition: 'all 0.15s', display: 'flex', alignItems: 'center', gap: 6,
+                  background: activeKey === k ? 'var(--surface2)' : 'transparent',
+                  color: activeKey === k ? 'var(--ink)' : 'var(--ink-3)',
+                  border: `1px solid ${activeKey === k ? 'var(--border)' : 'transparent'}`,
+                }}
+              >
+                {a.label}
+                {res && (
+                  <span style={{ width: 7, height: 7, borderRadius: '50%', background: sigColor, display: 'inline-block', flexShrink: 0 }} />
+                )}
+              </button>
+            );
+          })}
+        </div>
+
+        {/* Timeframe pills */}
+        <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap', alignItems: 'center' }}>
+          <span style={{ color: 'var(--ink-3)', fontSize: 11, fontWeight: 600, letterSpacing: '0.05em', marginRight: 4 }}>TF</span>
+          {TIMEFRAMES.map(tf => (
+            <button key={tf} onClick={() => setTimeframe(tf)} style={pill(timeframe === tf, SCALPING_TIMEFRAMES.includes(tf) ? 'var(--yellow)' : 'var(--violet)')}>
+              {TIMEFRAME_LABELS[tf]}
             </button>
           ))}
         </div>
 
         {error && (
-          <div className="bg-red-900/40 border border-red-700 text-red-300 px-4 py-3 rounded-xl text-sm">
+          <div style={{ background: 'var(--red-bg)', border: '1px solid var(--red)', borderRadius: 'var(--radius-sm)', padding: '10px 14px', fontSize: 13, color: 'var(--red)' }}>
             ⚠ {error}
           </div>
         )}
 
-        {loading && (
-          <div className="text-center text-slate-500 py-20 text-sm">Loading market data…</div>
+        {loading && !current && (
+          <div style={{ textAlign: 'center', color: 'var(--ink-3)', padding: '80px 0', fontSize: 13 }}>
+            Loading market data…
+          </div>
         )}
 
-        {!loading && current && (
-          <div className="space-y-4">
-            <SignalCard result={current} asset={LABELS[active]} />
+        {current && (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
+            <SignalCard result={current} asset={activeAsset.label} mode={mode} />
             <PriceChart candles={current.candles} signal={current.signal} />
             <IndicatorPanel indicators={current.indicators} price={current.candles.at(-1)?.close ?? 0} />
           </div>
         )}
 
-        <p className="text-center text-slate-600 text-xs pb-4">
-          Auto-refreshes every 30s · Data: Bybit public API · No auth required
-        </p>
+        <footer style={{ textAlign: 'center', color: 'var(--ink-3)', fontSize: 11, paddingBottom: 16 }}>
+          {lastRefresh ? `Updated ${lastRefresh.toLocaleTimeString()}` : 'Loading'} · Bybit API · No auth
+        </footer>
       </div>
     </div>
   );

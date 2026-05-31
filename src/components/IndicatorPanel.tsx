@@ -1,11 +1,11 @@
 import type { IndicatorValues, IndicatorSignal } from '../types';
 
-const dot: Record<IndicatorSignal, string> = {
-  bullish: 'text-emerald-400',
-  bearish: 'text-red-400',
-  neutral: 'text-yellow-400',
+const sigColor: Record<IndicatorSignal, string> = {
+  bullish: 'var(--green)',
+  bearish: 'var(--red)',
+  neutral: 'var(--yellow)',
 };
-const label: Record<IndicatorSignal, string> = {
+const sigLabel: Record<IndicatorSignal, string> = {
   bullish: '▲ Bullish',
   bearish: '▼ Bearish',
   neutral: '► Neutral',
@@ -13,11 +13,11 @@ const label: Record<IndicatorSignal, string> = {
 
 function Row({ name, value, signal }: { name: string; value: string; signal: IndicatorSignal }) {
   return (
-    <div className="flex items-center justify-between py-2 border-b border-slate-700 last:border-0">
-      <span className="text-slate-300 text-sm">{name}</span>
-      <div className="flex items-center gap-3">
-        <span className="text-white text-sm font-mono">{value}</span>
-        <span className={`${dot[signal]} text-xs font-semibold w-20 text-right`}>{label[signal]}</span>
+    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '9px 0', borderBottom: '1px solid var(--border)' }}>
+      <span style={{ color: 'var(--ink-2)', fontSize: 13 }}>{name}</span>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+        <span style={{ color: 'var(--ink)', fontSize: 12, fontFamily: 'ui-monospace, monospace' }}>{value}</span>
+        <span style={{ color: sigColor[signal], fontSize: 11, fontWeight: 600, minWidth: 76, textAlign: 'right' }}>{sigLabel[signal]}</span>
       </div>
     </div>
   );
@@ -27,17 +27,18 @@ type Props = { indicators: IndicatorValues; price: number };
 
 export function IndicatorPanel({ indicators: iv, price }: Props) {
   const f = (n: number, d = 2) => n.toFixed(d);
-  const fp = (n: number) => n > 999 ? f(n, 2) : f(n, 4);
+  const fp = (n: number) => n > 999 ? f(n, 2) : n > 1 ? f(n, 4) : f(n, 6);
+
   return (
-    <div className="rounded-2xl bg-slate-800 p-5">
-      <h3 className="text-slate-400 text-xs font-semibold uppercase tracking-wider mb-3">Indicators</h3>
+    <div style={{ background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 'var(--radius-lg)', padding: '14px 18px' }}>
+      <p style={{ color: 'var(--ink-3)', fontSize: 10, fontWeight: 600, letterSpacing: '0.07em', textTransform: 'uppercase', marginBottom: 4 }}>Indicators</p>
       <Row name="RSI (14)" value={f(iv.rsi)} signal={iv.rsiSignal} />
-      <Row name="EMA (9 / 21)" value={`${fp(iv.ema9)} / ${fp(iv.ema21)}`} signal={iv.emaSignal} />
-      <Row name="MACD (12,26,9)" value={`${fp(iv.macd)} / ${fp(iv.macdSignal)}`} signal={iv.macdTrend} />
+      <Row name="EMA 9 / 21" value={`${fp(iv.ema9)} / ${fp(iv.ema21)}`} signal={iv.emaSignal} />
+      <Row name="MACD (12, 26, 9)" value={`${fp(iv.macd)} / ${fp(iv.macdSignal)}`} signal={iv.macdTrend} />
       <Row name="Bollinger (20)" value={`${fp(iv.bbLower)} – ${fp(iv.bbUpper)}`} signal={iv.bbSignal} />
-      <div className="mt-3 pt-3 border-t border-slate-700 flex justify-between text-xs text-slate-500">
-        <span>Price</span>
-        <span className="text-white font-mono font-semibold">{fp(price)}</span>
+      <div style={{ display: 'flex', justifyContent: 'space-between', paddingTop: 10, marginTop: 2 }}>
+        <span style={{ color: 'var(--ink-3)', fontSize: 12 }}>Price</span>
+        <span style={{ color: 'var(--ink)', fontSize: 13, fontFamily: 'ui-monospace, monospace', fontWeight: 700 }}>{fp(price)}</span>
       </div>
     </div>
   );

@@ -1,5 +1,5 @@
 import { useEffect, useRef } from 'react';
-import { createChart, ColorType, createSeriesMarkers } from 'lightweight-charts';
+import { createChart, ColorType, createSeriesMarkers, CandlestickSeries } from 'lightweight-charts';
 import type { OHLCV, SignalType } from '../types';
 
 type Props = { candles: OHLCV[]; signal: SignalType };
@@ -11,13 +11,13 @@ export function PriceChart({ candles, signal }: Props) {
     if (!ref.current || candles.length === 0) return;
 
     const chart = createChart(ref.current, {
-      layout: { background: { type: ColorType.Solid, color: '#1e293b' }, textColor: '#94a3b8' },
-      grid: { vertLines: { color: '#334155' }, horzLines: { color: '#334155' } },
+      layout: { background: { type: ColorType.Solid, color: '#1a1f2e' }, textColor: '#5a6478' },
+      grid: { vertLines: { color: '#242a38' }, horzLines: { color: '#242a38' } },
       width: ref.current.clientWidth,
-      height: 320,
+      height: 300,
     });
 
-    const series = chart.addCandlestickSeries({
+    const series = chart.addSeries(CandlestickSeries, {
       upColor: '#10b981', downColor: '#ef4444',
       borderUpColor: '#10b981', borderDownColor: '#ef4444',
       wickUpColor: '#10b981', wickDownColor: '#ef4444',

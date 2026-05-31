@@ -1,12 +1,11 @@
-import type { Asset, OHLCV } from '../types';
+import type { OHLCV, Timeframe } from '../types';
 
 const BASE = 'https://api.bybit.com';
-const CATEGORY: Record<Asset, string> = { BTCUSDT: 'spot', XAUUSDT: 'linear' };
 
-export async function fetchKlines(asset: Asset, interval = '60', limit = 200): Promise<OHLCV[]> {
+export async function fetchKlines(symbol: string, category: 'spot' | 'linear', interval: Timeframe = '60', limit = 200): Promise<OHLCV[]> {
   const url = new URL(`${BASE}/v5/market/kline`);
-  url.searchParams.set('category', CATEGORY[asset]);
-  url.searchParams.set('symbol', asset);
+  url.searchParams.set('category', category);
+  url.searchParams.set('symbol', symbol);
   url.searchParams.set('interval', interval);
   url.searchParams.set('limit', String(limit));
 
