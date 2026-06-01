@@ -16,9 +16,14 @@ function makeDefault(): DemoAccount {
 function revive(raw: unknown): DemoAccount {
   const d = raw as DemoAccount;
   return {
-    marginMode: 'isolated',
     ...d,
-    positions: d.positions.map(p => ({ marginMode: 'isolated' as MarginMode, liqPrice: 0, ...p, openedAt: new Date(p.openedAt) })),
+    marginMode: d.marginMode ?? 'isolated',
+    positions: d.positions.map(p => ({
+      ...p,
+      marginMode: p.marginMode ?? ('isolated' as MarginMode),
+      liqPrice: p.liqPrice ?? 0,
+      openedAt: new Date(p.openedAt),
+    })),
     trades: d.trades.map(t => ({
       ...t,
       openedAt: new Date(t.openedAt),

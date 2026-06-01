@@ -230,7 +230,6 @@ export default function App() {
             <DemoPanel
               account={account}
               stats={stats}
-              mode={mode}
               activeAsset={activeAsset}
               currentResult={current}
               currentPrices={currentPrices}

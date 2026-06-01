@@ -1,12 +1,11 @@
 import { useState, useEffect } from 'react';
-import type { DemoAccount, AssetConfig, SignalResult, Mode, MarginMode } from '../types';
+import type { DemoAccount, AssetConfig, SignalResult, MarginMode } from '../types';
 import { LEVERAGE_OPTIONS } from '../types';
 import type { DemoStats } from '../store/demo';
 
 type Props = {
   account: DemoAccount;
   stats: DemoStats;
-  mode: Mode;
   activeAsset: AssetConfig;
   currentResult: SignalResult | undefined;
   currentPrices: Record<string, number>;
@@ -63,7 +62,6 @@ const ROW: React.CSSProperties = {
 
 export function DemoPanel({
   account,
-  mode,
   activeAsset,
   currentResult,
   currentPrices,
