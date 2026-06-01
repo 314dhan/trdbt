@@ -1,41 +1,85 @@
-import type { ClosedTrade } from '../types';
+import { useState } from 'react';
+import type { ClosedTrade, AccountEntry } from '../types';
 import type { DemoStats } from '../store/demo';
+import { Leaderboard } from './Leaderboard';
 
-type Props = { trades: ClosedTrade[]; stats: DemoStats };
+type Props = {
+  trades: ClosedTrade[];
+  stats: DemoStats;
+  accounts: AccountEntry[];
+  activeAccountId: string;
+};
 
-type StrategyTip = { title: string; tips: string[] };
+type Tip = { en: string; id: string };
+type StrategyTip = { title: string; titleId: string; tips: Tip[] };
 
 function getStrategyTip(winRate: number, totalTrades: number): StrategyTip | null {
   if (totalTrades < 5) return null;
   if (winRate < 30) {
     return {
       title: 'Strategy overhaul recommended',
+      titleId: 'Strategi perlu diubah total',
       tips: [
-        'Require 3+ indicators to agree (score ≥ 3) before entering any trade',
-        'Switch to 4H or Daily timeframe — higher TF signals carry less noise',
-        'Reduce leverage to 1–5× until win rate recovers above 50%',
-        'Consider only trading in the direction of the Daily trend',
+        {
+          en: 'Require 3+ indicators to agree (score ≥ 3) before entering any trade',
+          id: 'Tunggu minimal 3 indikator selaras (skor ≥ 3) sebelum masuk posisi',
+        },
+        {
+          en: 'Switch to 4H or Daily timeframe — higher TF signals carry less noise',
+          id: 'Gunakan timeframe 4H atau Daily — sinyal TF tinggi lebih bersih dari noise',
+        },
+        {
+          en: 'Reduce leverage to 1–5× until win rate recovers above 50%',
+          id: 'Kurangi leverage ke 1–5× sampai win rate kembali di atas 50%',
+        },
+        {
+          en: 'Consider only trading in the direction of the Daily trend',
+          id: 'Pertimbangkan hanya trading searah tren Daily',
+        },
       ],
     };
   }
   if (winRate < 50) {
     return {
       title: 'Below breakeven — adjust your edge',
+      titleId: 'Di bawah titik impas — perbaiki keunggulan strategi',
       tips: [
-        'Only enter when EMA crossover and RSI both confirm the same direction',
-        'Avoid 1m / 15m scalping — noise kills short-term win rate',
-        'Widen SL to 2× ATR to survive normal price volatility',
-        'Paper-trade a new strategy for 20+ signals before going live',
+        {
+          en: 'Only enter when EMA crossover and RSI both confirm the same direction',
+          id: 'Masuk hanya ketika EMA crossover dan RSI keduanya mengonfirmasi arah yang sama',
+        },
+        {
+          en: 'Avoid 1m / 15m scalping — noise kills short-term win rate',
+          id: 'Hindari scalping 1m / 15m — noise merusak win rate jangka pendek',
+        },
+        {
+          en: 'Widen SL to 2× ATR to survive normal price volatility',
+          id: 'Perlebar SL ke 2× ATR agar tahan volatilitas harga normal',
+        },
+        {
+          en: 'Paper-trade a new strategy for 20+ signals before going live',
+          id: 'Paper-trade strategi baru selama 20+ sinyal sebelum trading nyata',
+        },
       ],
     };
   }
   if (winRate < 60) {
     return {
       title: 'Marginal edge — fine-tune entries',
+      titleId: 'Keunggulan tipis — perbaiki titik masuk',
       tips: [
-        'Confirm 4H trend direction before acting on lower TF signals',
-        'Skip signals where score is ±2 — wait for ±3 or ±4 conviction',
-        'Take 50% profit at 1.5× ATR and trail the remaining position',
+        {
+          en: 'Confirm 4H trend direction before acting on lower TF signals',
+          id: 'Konfirmasi arah tren 4H sebelum bertindak pada sinyal TF lebih rendah',
+        },
+        {
+          en: 'Skip signals where score is ±2 — wait for ±3 or ±4 conviction',
+          id: 'Lewati sinyal dengan skor ±2 — tunggu keyakinan ±3 atau ±4',
+        },
+        {
+          en: 'Take 50% profit at 1.5× ATR and trail the remaining position',
+          id: 'Ambil 50% profit di 1.5× ATR, trailing sisa posisi',
+        },
       ],
     };
   }
@@ -58,7 +102,8 @@ const LABEL: React.CSSProperties = {
   textTransform: 'uppercase',
 };
 
-export function TradeLog({ trades, stats }: Props) {
+export function TradeLog({ trades, stats, accounts, activeAccountId }: Props) {
+  const [tab, setTab] = useState<'trades' | 'leaderboard'>('trades');
   const tip = getStrategyTip(stats.winRate, stats.totalTrades);
 
   const card: React.CSSProperties = {
@@ -71,10 +116,41 @@ export function TradeLog({ trades, stats }: Props) {
     gap: 14,
   };
 
+  const tabBtn = (active: boolean): React.CSSProperties => ({
+    padding: '5px 14px',
+    borderRadius: 6,
+    fontSize: 12,
+    fontWeight: 600,
+    cursor: 'pointer',
+    border: 'none',
+    background: active ? 'var(--violet)' : 'transparent',
+    color: active ? '#fff' : 'var(--ink-3)',
+    transition: 'all 0.15s',
+  });
+
+  const header = (
+    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+      <h3 style={{ fontSize: 14, fontWeight: 700, color: 'var(--ink)' }}>Trade Log</h3>
+      <div style={{ display: 'flex', background: 'var(--surface2)', borderRadius: 8, padding: 2, gap: 2, border: '1px solid var(--border)' }}>
+        <button onClick={() => setTab('trades')} style={tabBtn(tab === 'trades')}>My Trades</button>
+        <button onClick={() => setTab('leaderboard')} style={tabBtn(tab === 'leaderboard')}>🏆 Leaderboard</button>
+      </div>
+    </div>
+  );
+
+  if (tab === 'leaderboard') {
+    return (
+      <div style={card}>
+        {header}
+        <Leaderboard accounts={accounts} activeId={activeAccountId} />
+      </div>
+    );
+  }
+
   if (stats.totalTrades === 0) {
     return (
       <div style={card}>
-        <h3 style={{ fontSize: 14, fontWeight: 700, color: 'var(--ink)' }}>Trade Log</h3>
+        {header}
         <p style={{ color: 'var(--ink-3)', fontSize: 13, textAlign: 'center', padding: '20px 0' }}>
           No closed trades yet. Open a position from the Demo Account panel above.
         </p>
@@ -91,7 +167,7 @@ export function TradeLog({ trades, stats }: Props) {
 
   return (
     <div style={card}>
-      <h3 style={{ fontSize: 14, fontWeight: 700, color: 'var(--ink)' }}>Trade Log</h3>
+      {header}
 
       {/* Stats grid */}
       <div
@@ -144,13 +220,18 @@ export function TradeLog({ trades, stats }: Props) {
             padding: '12px 14px',
           }}
         >
-          <p style={{ color: 'var(--yellow)', fontSize: 12, fontWeight: 700, marginBottom: 8 }}>
+          <p style={{ color: 'var(--yellow)', fontSize: 12, fontWeight: 700, marginBottom: 2 }}>
             ⚡ {tip.title}
+          </p>
+          <p style={{ color: 'var(--yellow)', fontSize: 11, fontWeight: 500, marginBottom: 8, opacity: 0.8 }}>
+            {tip.titleId}
           </p>
           <ul style={{ margin: 0, paddingLeft: 18 }}>
             {tip.tips.map((t, i) => (
-              <li key={i} style={{ color: 'var(--ink-2)', fontSize: 12, marginBottom: 3 }}>
-                {t}
+              <li key={i} style={{ color: 'var(--ink-2)', fontSize: 12, marginBottom: 6 }}>
+                {t.en}
+                <br />
+                <span style={{ color: 'var(--ink-3)', fontSize: 11 }}>{t.id}</span>
               </li>
             ))}
           </ul>

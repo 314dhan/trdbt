@@ -8,7 +8,9 @@ import { IndicatorPanel } from './components/IndicatorPanel';
 import { PriceChart } from './components/PriceChart';
 import { DemoPanel } from './components/DemoPanel';
 import { TradeLog } from './components/TradeLog';
+import { AccountSwitcher } from './components/AccountSwitcher';
 import { useDemo } from './store/demo';
+import { useAccounts } from './store/accounts';
 
 const TIMEFRAMES = Object.keys(TIMEFRAME_LABELS) as Timeframe[];
 
@@ -24,7 +26,8 @@ export default function App() {
   const [lastRefresh, setLastRefresh] = useState<Date | null>(null);
   const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
-  const { account, stats, setBalance, setLeverage, setMarginMode, openTrade, closeTrade, checkAutoClose, resetAccount } = useDemo();
+  const { accounts, activeId, switchAccount, createAccount, deleteAccount } = useAccounts();
+  const { account, stats, setBalance, setLeverage, setMarginMode, openTrade, closeTrade, checkAutoClose, resetAccount } = useDemo(activeId);
 
   const assets = ASSET_CONFIGS.filter(a => a.mode === mode);
   const activeAsset = assets.find(a => assetKey(a) === activeKey) ?? assets[0];
@@ -215,8 +218,15 @@ export default function App() {
             )}
           </div>
 
-          {/* Right: demo account + trade log (sticky) */}
+          {/* Right: account switcher + demo account + trade log (sticky) */}
           <div style={{ display: 'flex', flexDirection: 'column', gap: 14, position: 'sticky', top: 24 }}>
+            <AccountSwitcher
+              accounts={accounts}
+              activeId={activeId}
+              onSwitch={switchAccount}
+              onCreate={createAccount}
+              onDelete={id => deleteAccount(id, activeId)}
+            />
             <DemoPanel
               account={account}
               stats={stats}
@@ -231,7 +241,7 @@ export default function App() {
               onCloseTrade={closeTrade}
               onReset={resetAccount}
             />
-            <TradeLog trades={account.trades} stats={stats} />
+            <TradeLog trades={account.trades} stats={stats} accounts={accounts} activeAccountId={activeId} />
           </div>
 
         </div>

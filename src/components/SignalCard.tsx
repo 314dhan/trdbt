@@ -16,7 +16,7 @@ const CONFIG: Record<string, Record<string, { color: string; bg: string; label: 
 type Props = { result: SignalResult; asset: string; mode: Mode };
 
 export function SignalCard({ result, asset, mode }: Props) {
-  const { signal, score, updatedAt, tpsl } = result;
+  const { signal, score, signalStrength, trendAligned, updatedAt, tpsl } = result;
   const c = CONFIG[mode][signal];
   const fp = (n: number) => n > 999 ? n.toFixed(2) : n > 1 ? n.toFixed(4) : n.toFixed(6);
   const showTpSl = signal !== 'NEUTRAL';
@@ -35,17 +35,35 @@ export function SignalCard({ result, asset, mode }: Props) {
             <span style={{ color: c.color, fontSize: 24, fontWeight: 800, letterSpacing: '-0.01em' }}>{c.label}</span>
           </div>
           <p style={{ color: c.color, fontSize: 12, fontWeight: 600, marginTop: 6 }}>
-            {score > 0 ? `+${score}` : score} of 4 indicators agree
+            {score > 0 ? `+${score}` : score} of 5 indicators agree
+            {signal !== 'NEUTRAL' && (
+              <span style={{
+                marginLeft: 8,
+                fontSize: 10,
+                fontWeight: 700,
+                padding: '2px 6px',
+                borderRadius: 3,
+                background: signalStrength === 'strong' ? c.bg : 'var(--surface2)',
+                color: signalStrength === 'strong' ? c.color : 'var(--ink-3)',
+                letterSpacing: '0.04em',
+              }}>
+                {signalStrength.toUpperCase()}
+              </span>
+            )}
+            {signal !== 'NEUTRAL' && !trendAligned && (
+              <span style={{ marginLeft: 6, fontSize: 10, color: 'var(--yellow)', fontWeight: 700 }}>⚠ COUNTER-TREND</span>
+            )}
           </p>
         </div>
 
         {/* Score dots */}
         <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 4 }}>
-          {[1, 2, 3, 4].map(i => {
+          {[1, 2, 3, 4, 5].map(i => {
             const filled = Math.abs(score) >= i;
+            const isThreshold = i === 3;
             const color = score > 0 ? 'var(--green)' : score < 0 ? 'var(--red)' : 'var(--ink-3)';
             return (
-              <div key={i} style={{ width: 10, height: 10, borderRadius: '50%', background: filled ? color : 'var(--surface2)', border: `1px solid ${filled ? color : 'var(--border)'}`, transition: 'background 0.2s' }} />
+              <div key={i} style={{ width: 10, height: 10, borderRadius: '50%', background: filled ? color : 'var(--surface2)', border: `1px solid ${filled ? color : isThreshold ? 'var(--ink-3)' : 'var(--border)'}`, transition: 'background 0.2s' }} />
             );
           })}
           <p style={{ color: 'var(--ink-3)', fontSize: 10, marginTop: 2 }}>{updatedAt.toLocaleTimeString()}</p>

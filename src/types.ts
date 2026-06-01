@@ -85,6 +85,12 @@ export type DemoAccount = {
 
 export const LEVERAGE_OPTIONS = [1, 2, 3, 5, 10, 15, 20, 25, 50, 75, 100, 125, 150, 200, 250] as const;
 
+export type AccountEntry = {
+  id: string;
+  name: string;
+  createdAt: string;
+};
+
 export type SignalType = 'BUY' | 'SELL' | 'NEUTRAL';
 
 export type IndicatorSignal = 'bullish' | 'bearish' | 'neutral';
@@ -95,6 +101,9 @@ export type IndicatorValues = {
   ema9: number;
   ema21: number;
   emaSignal: IndicatorSignal;
+  ema50: number;
+  ema200: number;
+  trendSignal: IndicatorSignal;
   macd: number;
   macdSignal: number;
   macdHistogram: number;
@@ -103,6 +112,8 @@ export type IndicatorValues = {
   bbMiddle: number;
   bbLower: number;
   bbSignal: IndicatorSignal;
+  relVolume: number;
+  volumeSignal: IndicatorSignal;
 };
 
 export type TPSL = {
@@ -116,6 +127,8 @@ export type TPSL = {
 export type SignalResult = {
   signal: SignalType;
   score: number;
+  signalStrength: 'strong' | 'moderate' | 'weak';
+  trendAligned: boolean;
   indicators: IndicatorValues;
   tpsl: TPSL;
   candles: OHLCV[];

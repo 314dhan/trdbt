@@ -1,6 +1,6 @@
 import { calcEMA } from './ema';
 
-export type MACDResult = { macd: number; signal: number; histogram: number };
+export type MACDResult = { macd: number; signal: number; histogram: number; prevHistogram: number };
 
 export function calcMACD(closes: number[], fast = 12, slow = 26, signal = 9): MACDResult {
   const fastEMA = calcEMA(closes, fast);
@@ -10,5 +10,12 @@ export function calcMACD(closes: number[], fast = 12, slow = 26, signal = 9): MA
   const signalLine = calcEMA(validMACD, signal);
   const lastMACD = validMACD.at(-1) ?? 0;
   const lastSignal = signalLine.at(-1) ?? 0;
-  return { macd: lastMACD, signal: lastSignal, histogram: lastMACD - lastSignal };
+  const prevMACD = validMACD.at(-2) ?? lastMACD;
+  const prevSignal = signalLine.at(-2) ?? lastSignal;
+  return {
+    macd: lastMACD,
+    signal: lastSignal,
+    histogram: lastMACD - lastSignal,
+    prevHistogram: prevMACD - prevSignal,
+  };
 }

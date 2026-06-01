@@ -1,7 +1,5 @@
-import { useState, useEffect, useCallback } from 'react';
-import type { DemoAccount, OpenPosition, ClosedTrade, AssetConfig, SignalResult, MarginMode } from '../types';
-
-const STORAGE_KEY = 'tsb-demo-v1';
+import { useState, useEffect, useCallback, useRef } from 'react';
+import type { DemoAccount, OpenPosition, ClosedTrade, AssetConfig, SignalResult, MarginMode, TradeDirection } from '../types';
 
 export type DemoStats = {
   totalTrades: number;
@@ -29,14 +27,17 @@ function revive(raw: unknown): DemoAccount {
   };
 }
 
-function load(): DemoAccount {
+function load(storageKey: string): DemoAccount {
   try {
-    const raw = localStorage.getItem(STORAGE_KEY);
-    if (!raw) return makeDefault();
-    return revive(JSON.parse(raw));
-  } catch {
-    return makeDefault();
-  }
+    const raw = localStorage.getItem(storageKey);
+    if (raw) return revive(JSON.parse(raw));
+    // Migrate legacy single-account data to default account on first load
+    if (storageKey === 'tsb-account-default') {
+      const legacy = localStorage.getItem('tsb-demo-v1');
+      if (legacy) return revive(JSON.parse(legacy));
+    }
+  } catch {}
+  return makeDefault();
 }
 
 // Isolated: only position margin at risk
@@ -71,12 +72,25 @@ function calcPnl(pos: OpenPosition, exitPrice: number): { pnl: number; pnlPct: n
   return { pnl: Math.max(-pos.size, pnl), pnlPct };
 }
 
-export function useDemo() {
-  const [account, setAccount] = useState<DemoAccount>(load);
+export function useDemo(accountId: string) {
+  const storageKey = `tsb-account-${accountId}`;
+  const skipSave = useRef(false);
+
+  const [account, setAccount] = useState<DemoAccount>(() => load(storageKey));
+
+  // Reload account data when switching accounts; guard against saving stale data
+  useEffect(() => {
+    skipSave.current = true;
+    setAccount(load(storageKey));
+  }, [storageKey]);
 
   useEffect(() => {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(account));
-  }, [account]);
+    if (skipSave.current) {
+      skipSave.current = false;
+      return;
+    }
+    localStorage.setItem(storageKey, JSON.stringify(account));
+  }, [account, storageKey]);
 
   const setBalance = useCallback((balance: number) => {
     setAccount(prev => ({ ...prev, balance }));
