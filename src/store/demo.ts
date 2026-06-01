@@ -37,11 +37,9 @@ function load(storageKey: string): DemoAccount {
   try {
     const raw = localStorage.getItem(storageKey);
     if (raw) return revive(JSON.parse(raw));
-    // Migrate legacy single-account data to default account on first load
-    if (storageKey === 'tsb-account-default') {
-      const legacy = localStorage.getItem('tsb-demo-v1');
-      if (legacy) return revive(JSON.parse(legacy));
-    }
+    // Migrate legacy single-account data on first load for any new account key
+    const legacy = localStorage.getItem('tsb-demo-v1');
+    if (legacy) return revive(JSON.parse(legacy));
   } catch {}
   return makeDefault();
 }
