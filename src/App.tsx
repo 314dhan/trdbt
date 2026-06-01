@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback, useRef } from 'react';
+import { useState, useEffect, useCallback, useRef, useMemo } from 'react';
 import type { Mode, AssetConfig, SignalResult, Timeframe } from './types';
 import { ASSET_CONFIGS, TIMEFRAME_LABELS, SCALPING_TIMEFRAMES, refreshInterval } from './types';
 import { fetchKlines } from './api/bybit';
@@ -6,6 +6,9 @@ import { aggregate } from './signals/aggregate';
 import { SignalCard } from './components/SignalCard';
 import { IndicatorPanel } from './components/IndicatorPanel';
 import { PriceChart } from './components/PriceChart';
+import { DemoPanel } from './components/DemoPanel';
+import { TradeLog } from './components/TradeLog';
+import { useDemo } from './store/demo';
 
 const TIMEFRAMES = Object.keys(TIMEFRAME_LABELS) as Timeframe[];
 
@@ -21,32 +24,67 @@ export default function App() {
   const [lastRefresh, setLastRefresh] = useState<Date | null>(null);
   const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
+  const { account, stats, setBalance, setLeverage, setMarginMode, openTrade, closeTrade, checkAutoClose, resetAccount } = useDemo();
+
   const assets = ASSET_CONFIGS.filter(a => a.mode === mode);
   const activeAsset = assets.find(a => assetKey(a) === activeKey) ?? assets[0];
 
-  const refresh = useCallback(async (tf: Timeframe, assetList: AssetConfig[]) => {
+  const currentPrices = useMemo(() => {
+    const prices: Record<string, number> = {};
+    for (const [key, res] of Object.entries(results)) {
+      const asset = ASSET_CONFIGS.find(a => assetKey(a) === key);
+      if (asset) prices[asset.symbol] = res.tpsl.entry;
+    }
+    return prices;
+  }, [results]);
+
+  const fetchAssets = useCallback(async (tf: Timeframe, assetList: AssetConfig[]) => {
+    const entries = await Promise.all(
+      assetList.map(async a => [assetKey(a), aggregate(await fetchKlines(a.symbol, a.category, tf))] as const)
+    );
+    setResults(prev => ({ ...prev, ...Object.fromEntries(entries) }));
+    const prices: Record<string, number> = {};
+    for (const [key, res] of entries) {
+      const asset = assetList.find(a => assetKey(a) === key);
+      if (asset) prices[asset.symbol] = res.tpsl.entry;
+    }
+    checkAutoClose(prices);
+    return entries;
+  }, [checkAutoClose]);
+
+  const refresh = useCallback(async (tf: Timeframe, assetList: AssetConfig[], activeOnly = false) => {
     try {
       setError(null);
       setLoading(true);
-      const entries = await Promise.all(
-        assetList.map(async a => [assetKey(a), aggregate(await fetchKlines(a.symbol, a.category, tf))] as const)
-      );
-      setResults(prev => ({ ...prev, ...Object.fromEntries(entries) }));
+      // Fast tick: fetch only active asset to avoid rate limits
+      // Background tick (every 3rd call): fetch all assets for signal dots
+      const toFetch = activeOnly
+        ? assetList.filter(a => assetKey(a) === activeKey)
+        : assetList;
+      await fetchAssets(tf, toFetch);
       setLastRefresh(new Date());
     } catch (e) {
       setError((e as Error).message);
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [fetchAssets, activeKey]);
+
+  const tickRef = useRef(0);
 
   useEffect(() => {
     const list = ASSET_CONFIGS.filter(a => a.mode === mode);
-    refresh(timeframe, list);
+    tickRef.current = 0;
+    refresh(timeframe, list, false); // initial: fetch all
 
     if (intervalRef.current) clearInterval(intervalRef.current);
     const ms = refreshInterval(timeframe);
-    intervalRef.current = setInterval(() => refresh(timeframe, list), ms);
+    intervalRef.current = setInterval(() => {
+      tickRef.current += 1;
+      // Every 3rd tick fetch all assets; otherwise only active (saves ~85% of requests)
+      const activeOnly = tickRef.current % 3 !== 0;
+      refresh(timeframe, list, activeOnly);
+    }, ms);
     return () => { if (intervalRef.current) clearInterval(intervalRef.current); };
   }, [refresh, timeframe, mode]);
 
@@ -78,8 +116,8 @@ export default function App() {
   } as React.CSSProperties);
 
   return (
-    <div style={{ background: 'var(--bg)', minHeight: '100vh', padding: '24px 16px' }}>
-      <div style={{ maxWidth: 720, margin: '0 auto', display: 'flex', flexDirection: 'column', gap: 18 }}>
+    <div style={{ background: 'var(--bg)', minHeight: '100vh', padding: '24px 20px' }}>
+      <div style={{ maxWidth: 1280, margin: '0 auto', display: 'flex', flexDirection: 'column', gap: 16 }}>
 
         {/* Header */}
         <header style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 16 }}>
@@ -158,19 +196,45 @@ export default function App() {
           </div>
         )}
 
-        {loading && !current && (
-          <div style={{ textAlign: 'center', color: 'var(--ink-3)', padding: '80px 0', fontSize: 13 }}>
-            Loading market data…
-          </div>
-        )}
+        {/* Two-column layout */}
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 380px', gap: 18, alignItems: 'start' }}>
 
-        {current && (
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
-            <SignalCard result={current} asset={activeAsset.label} mode={mode} />
-            <PriceChart candles={current.candles} signal={current.signal} />
-            <IndicatorPanel indicators={current.indicators} price={current.candles.at(-1)?.close ?? 0} />
+          {/* Left: signal analysis */}
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 14, minWidth: 0 }}>
+            {loading && !current && (
+              <div style={{ textAlign: 'center', color: 'var(--ink-3)', padding: '80px 0', fontSize: 13 }}>
+                Loading market data…
+              </div>
+            )}
+            {current && (
+              <>
+                <SignalCard result={current} asset={activeAsset.label} mode={mode} />
+                <PriceChart candles={current.candles} signal={current.signal} />
+                <IndicatorPanel indicators={current.indicators} price={current.candles.at(-1)?.close ?? 0} />
+              </>
+            )}
           </div>
-        )}
+
+          {/* Right: demo account + trade log (sticky) */}
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 14, position: 'sticky', top: 24 }}>
+            <DemoPanel
+              account={account}
+              stats={stats}
+              mode={mode}
+              activeAsset={activeAsset}
+              currentResult={current}
+              currentPrices={currentPrices}
+              onSetBalance={setBalance}
+              onSetLeverage={setLeverage}
+              onSetMarginMode={setMarginMode}
+              onOpenTrade={openTrade}
+              onCloseTrade={closeTrade}
+              onReset={resetAccount}
+            />
+            <TradeLog trades={account.trades} stats={stats} />
+          </div>
+
+        </div>
 
         <footer style={{ textAlign: 'center', color: 'var(--ink-3)', fontSize: 11, paddingBottom: 16 }}>
           {lastRefresh ? `Updated ${lastRefresh.toLocaleTimeString()}` : 'Loading'} · Bybit API · No auth

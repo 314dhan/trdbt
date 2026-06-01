@@ -40,6 +40,51 @@ export function refreshInterval(tf: Timeframe): number {
   return 30_000;
 }
 
+export type TradeDirection = 'LONG' | 'SHORT';
+export type MarginMode = 'isolated' | 'cross';
+
+export type OpenPosition = {
+  id: string;
+  asset: string;
+  symbol: string;
+  direction: TradeDirection;
+  entry: number;
+  tp: number;
+  sl: number;
+  liqPrice: number;
+  size: number;
+  leverage: number;
+  marginMode: MarginMode;
+  openedAt: Date;
+};
+
+export type ClosedTrade = {
+  id: string;
+  asset: string;
+  symbol: string;
+  direction: TradeDirection;
+  entry: number;
+  exitPrice: number;
+  size: number;
+  leverage: number;
+  pnl: number;
+  pnlPct: number;
+  win: boolean;
+  openedAt: Date;
+  closedAt: Date;
+  closeReason: 'TP' | 'SL' | 'Manual' | 'Liquidated';
+};
+
+export type DemoAccount = {
+  balance: number;
+  leverage: number;
+  marginMode: MarginMode;
+  positions: OpenPosition[];
+  trades: ClosedTrade[];
+};
+
+export const LEVERAGE_OPTIONS = [1, 2, 3, 5, 10, 15, 20, 25, 50, 75, 100, 125, 150, 200, 250] as const;
+
 export type SignalType = 'BUY' | 'SELL' | 'NEUTRAL';
 
 export type IndicatorSignal = 'bullish' | 'bearish' | 'neutral';
