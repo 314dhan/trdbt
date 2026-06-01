@@ -1,12 +1,11 @@
 import { useState } from 'react';
-import type { ClosedTrade, AccountEntry } from '../types';
+import type { ClosedTrade } from '../types';
 import type { DemoStats } from '../store/demo';
 import { Leaderboard } from './Leaderboard';
 
 type Props = {
   trades: ClosedTrade[];
   stats: DemoStats;
-  accounts: AccountEntry[];
   activeAccountId: string;
 };
 
@@ -102,7 +101,7 @@ const LABEL: React.CSSProperties = {
   textTransform: 'uppercase',
 };
 
-export function TradeLog({ trades, stats, accounts, activeAccountId }: Props) {
+export function TradeLog({ trades, stats, activeAccountId }: Props) {
   const [tab, setTab] = useState<'trades' | 'leaderboard'>('trades');
   const tip = getStrategyTip(stats.winRate, stats.totalTrades);
 
@@ -142,7 +141,7 @@ export function TradeLog({ trades, stats, accounts, activeAccountId }: Props) {
     return (
       <div style={card}>
         {header}
-        <Leaderboard accounts={accounts} activeId={activeAccountId} />
+        <Leaderboard activeId={activeAccountId} />
       </div>
     );
   }

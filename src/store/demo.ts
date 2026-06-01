@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import type { DemoAccount, OpenPosition, ClosedTrade, AssetConfig, SignalResult, MarginMode, TradeDirection } from '../types';
+import { supabase } from '../lib/supabase';
 
 export type DemoStats = {
   totalTrades: number;
@@ -96,6 +97,30 @@ export function useDemo(accountId: string) {
     }
     localStorage.setItem(storageKey, JSON.stringify(account));
   }, [account, storageKey]);
+
+  // Sync closed trades to Supabase (upsert = idempotent, safe on account switch)
+  useEffect(() => {
+    if (account.trades.length === 0) return;
+    const rows = account.trades.map(t => ({
+      id: t.id,
+      account_id: accountId,
+      asset: t.asset,
+      symbol: t.symbol,
+      direction: t.direction,
+      entry: t.entry,
+      exit_price: t.exitPrice,
+      size: t.size,
+      leverage: t.leverage,
+      pnl: t.pnl,
+      pnl_pct: t.pnlPct,
+      win: t.win,
+      close_reason: t.closeReason,
+      opened_at: t.openedAt,
+      closed_at: t.closedAt,
+    }));
+    supabase.from('trades').upsert(rows, { onConflict: 'id' })
+      .then(({ error }) => { if (error) console.warn('Trade sync failed:', error.message); });
+  }, [account.trades, accountId]);
 
   const setBalance = useCallback((balance: number) => {
     setAccount(prev => ({ ...prev, balance }));

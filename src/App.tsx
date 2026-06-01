@@ -240,7 +240,7 @@ export default function App() {
               onCloseTrade={closeTrade}
               onReset={resetAccount}
             />
-            <TradeLog trades={account.trades} stats={stats} accounts={accounts} activeAccountId={activeId} />
+            <TradeLog trades={account.trades} stats={stats} activeAccountId={activeId} />
           </div>
 
         </div>
